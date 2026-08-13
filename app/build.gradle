@@ -4,12 +4,17 @@ android {
     namespace 'com.myassistant.app'
     compileSdk 35
 
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
         applicationId 'com.myassistant.app'
         minSdk 26
         targetSdk 35
         versionCode 3
-        versionName '3.0'
+        versionName '4.0'
+        buildConfigField 'String', 'GROQ_API_KEY', '"' + (System.getenv('GROQ_API_KEY') ?: '') + '"'
     }
 }
 

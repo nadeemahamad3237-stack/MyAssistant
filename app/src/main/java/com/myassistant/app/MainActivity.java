@@ -21,7 +21,7 @@ import java.util.*;
 public class MainActivity extends AppCompatActivity {
     LinearLayout messages, chatList, sidebar;
     EditText input;
-    TextView title, status, settings;
+    TextView title, status;
     ScrollView scroll;
     SharedPreferences sp;
     JSONArray chats;
@@ -37,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
         messages=findViewById(R.id.messages); chatList=findViewById(R.id.chatList);
         sidebar=findViewById(R.id.sidebar); input=findViewById(R.id.input);
         title=findViewById(R.id.title); status=findViewById(R.id.status);
-        scroll=findViewById(R.id.scroll); settings=findViewById(R.id.settings);
+        scroll=findViewById(R.id.scroll);
 
         sp=getSharedPreferences("memory",MODE_PRIVATE);
         loadChats();
@@ -45,8 +45,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.menu).setOnClickListener(v->toggleSidebar());
         findViewById(R.id.newChat).setOnClickListener(v->{newChat(); toggleSidebar();});
         findViewById(R.id.send).setOnClickListener(v->send());
-        findViewById(R.id.more).setOnClickListener(v->showSettings());
-        settings.setOnClickListener(v->showSettings());
+        findViewById(R.id.more).setOnClickListener(v->Toast.makeText(this,"API key build environment se configured hai.",Toast.LENGTH_SHORT).show());
         findViewById(R.id.mic).setOnClickListener(v->startVoice());
         input.setOnEditorActionListener((v,a,e)->{send();return true;});
         renderCurrent();
@@ -153,7 +152,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     String callAI(String user){
-        String key=sp.getString("groq_key","");
+        String key=BuildConfig.GROQ_API_KEY;
         if(key.isEmpty()) return "Bhai, AI key abhi set nahi hai. ☺️ Menu → AI Settings me apni Groq API key add kar do, phir main properly tumhare saath chat karunga.";
         try{
             JSONObject body=new JSONObject(); body.put("model","llama-3.3-70b-versatile"); body.put("max_completion_tokens",700);
@@ -187,15 +186,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void toggleSidebar(){sidebar.setVisibility(sidebar.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE); if(sidebar.getVisibility()==View.VISIBLE)renderSidebar();}
-
-    void showSettings(){
-        LinearLayout l=new LinearLayout(this);l.setPadding(35,10,35,0);l.setOrientation(LinearLayout.VERTICAL);
-        EditText key=new EditText(this);key.setHint("Groq API key");key.setSingleLine(true);key.setText(sp.getString("groq_key",""));
-        l.addView(key);
-        new AlertDialog.Builder(this).setTitle("AI Settings").setMessage("API key device par locally save hogi. GitHub me commit nahi hoti.").setView(l)
-            .setPositiveButton("Save",(d,w)->sp.edit().putString("groq_key",key.getText().toString().trim()).apply())
-            .setNegativeButton("Cancel",null).show();
-    }
 
     void startVoice(){
         if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
