@@ -54,11 +54,32 @@ public class MainActivity extends AppCompatActivity {
     void loadChats(){
         try { chats=new JSONArray(sp.getString("chats","[]")); }
         catch(Exception e){ chats=new JSONArray(); }
-        if(chats.length()==0) newChat();
-        else currentId=chats.optJSONObject(0).optString("id");
+
+        if(chats.length()==0) {
+            newChat();
+            return;
+        }
+
+        String savedId=sp.getString("current_chat_id","");
+        boolean found=false;
+
+        for(int i=0;i<chats.length();i++){
+            if(chats.optJSONObject(i).optString("id").equals(savedId)){
+                currentId=savedId;
+                found=true;
+                break;
+            }
+        }
+
+        if(!found) currentId=chats.optJSONObject(0).optString("id");
     }
 
-    void persist(){ sp.edit().putString("chats",chats.toString()).apply(); }
+    void persist(){
+        sp.edit()
+            .putString("chats",chats.toString())
+            .putString("current_chat_id",currentId)
+            .commit();
+    }
 
     void newChat(){
         JSONObject c=new JSONObject();
@@ -125,9 +146,24 @@ public class MainActivity extends AppCompatActivity {
         TextView who=new TextView(this); who.setText(role.equals("user")?"You":"MyAssistant");
         who.setTextColor(role.equals("user")?purple:Color.rgb(150,153,165)); who.setTextSize(15); who.setTypeface(null,1);
         TextView body=new TextView(this); body.setText(text); body.setTextColor(Color.WHITE); body.setTextSize(18);
-        body.setPadding(18,14,18,14); body.setBackgroundResource(role.equals("user")?R.drawable.bg_message_user:R.drawable.bg_message_ai);
+        body.setPadding(18,14,18,14);
+        body.setBackgroundResource(role.equals("user")?R.drawable.bg_message_user:R.drawable.bg_message_ai);
+
+        body.setOnLongClickListener(v -> {
+            copyMessage(text);
+            return true;
+        });
+
         LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2); bp.setMargins(0,6,0,18);
         box.addView(who); box.addView(body,bp); messages.addView(box);
+    }
+
+    void copyMessage(String text){
+        ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+        if(cm!=null){
+            cm.setPrimaryClip(ClipData.newPlainText("MyAssistant",text));
+            Toast.makeText(this,"Copied ✓",Toast.LENGTH_SHORT).show();
+        }
     }
 
     void send(){
