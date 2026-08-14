@@ -43,7 +43,9 @@ public class MainActivity extends AppCompatActivity {
         loadChats();
         tts=new TextToSpeech(this, x->{});
         findViewById(R.id.menu).setOnClickListener(v->toggleSidebar());
-        findViewById(R.id.newChat).setOnClickListener(v->{newChat(); toggleSidebar();});
+        findViewById(R.id.sidebarClose).setOnClickListener(v->closeSidebar());
+        findViewById(R.id.sidebarScrim).setOnClickListener(v->closeSidebar());
+        findViewById(R.id.newChat).setOnClickListener(v->{newChat(); closeSidebar();});
         findViewById(R.id.send).setOnClickListener(v->send());
         findViewById(R.id.more).setOnClickListener(v->Toast.makeText(this,"API key build environment se configured hai.",Toast.LENGTH_SHORT).show());
         findViewById(R.id.mic).setOnClickListener(v->startVoice());
@@ -123,7 +125,12 @@ public class MainActivity extends AppCompatActivity {
             TextView row=new TextView(this); row.setText(c.optString("title","New chat")); row.setTextColor(Color.rgb(220,220,228));
             row.setTextSize(17); row.setPadding(12,18,8,18);
             final String id=c.optString("id");
-            row.setOnClickListener(v->{currentId=id; renderCurrent(); toggleSidebar();});
+            row.setOnClickListener(v->{
+                currentId=id;
+                persist();
+                renderCurrent();
+                closeSidebar();
+            });
             row.setOnLongClickListener(v->{chatMenu(id);return true;});
             chatList.addView(row);
         }
@@ -161,11 +168,10 @@ public class MainActivity extends AppCompatActivity {
         who.setTextColor(role.equals("user")?purple:Color.rgb(150,153,165));
         who.setTextSize(15);
         who.setTypeface(null,1);
-
         box.addView(who);
 
-        // Render markdown-style fenced code blocks separately.
         int pos=0;
+
         while(pos<text.length()){
             int open=text.indexOf("```",pos);
 
@@ -179,11 +185,8 @@ public class MainActivity extends AppCompatActivity {
             }
 
             int codeStart=text.indexOf('\n',open+3);
-            if(codeStart<0){
-                codeStart=open+3;
-            }else{
-                codeStart++;
-            }
+            if(codeStart<0) codeStart=open+3;
+            else codeStart++;
 
             int close=text.indexOf("```",codeStart);
 
@@ -192,15 +195,14 @@ public class MainActivity extends AppCompatActivity {
                 break;
             }
 
-            String code=text.substring(codeStart,close);
-            addCodeBlock(box,code);
+            addCodeBlock(box,text.substring(codeStart,close));
             pos=close+3;
         }
 
-        LinearLayout.LayoutParams boxParams=
+        LinearLayout.LayoutParams bp=
             new LinearLayout.LayoutParams(-1,-2);
-        boxParams.setMargins(0,6,0,18);
-        messages.addView(box,boxParams);
+        bp.setMargins(0,6,0,18);
+        messages.addView(box,bp);
     }
 
     void addSelectableText(LinearLayout parent,String text,String role){
@@ -211,13 +213,11 @@ public class MainActivity extends AppCompatActivity {
         body.setTextColor(Color.WHITE);
         body.setTextSize(18);
         body.setTextIsSelectable(true);
+        body.setLongClickable(true);
         body.setPadding(18,14,18,14);
         body.setBackgroundResource(
             role.equals("user")?R.drawable.bg_message_user:R.drawable.bg_message_ai
         );
-
-        // Normal Android text selection: long-press -> select/copy.
-        body.setLongClickable(true);
 
         LinearLayout.LayoutParams bp=
             new LinearLayout.LayoutParams(-1,-2);
@@ -242,7 +242,6 @@ public class MainActivity extends AppCompatActivity {
 
         Button copy=new Button(this);
         copy.setText("Copy");
-        copy.setTextSize(12);
         copy.setOnClickListener(v->{
             ClipboardManager cm=
                 (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
@@ -254,12 +253,8 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        header.addView(label,new LinearLayout.LayoutParams(
-            0,-2,1
-        ));
-        header.addView(copy,new LinearLayout.LayoutParams(
-            -2,-2
-        ));
+        header.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+        header.addView(copy,new LinearLayout.LayoutParams(-2,-2));
 
         TextView codeView=new TextView(this);
         codeView.setText(code);
@@ -271,9 +266,7 @@ public class MainActivity extends AppCompatActivity {
         codeView.setPadding(4,12,4,8);
 
         card.addView(header);
-        card.addView(codeView,new LinearLayout.LayoutParams(
-            -1,-2
-        ));
+        card.addView(codeView,new LinearLayout.LayoutParams(-1,-2));
 
         LinearLayout.LayoutParams cp=
             new LinearLayout.LayoutParams(-1,-2);
@@ -336,7 +329,19 @@ public class MainActivity extends AppCompatActivity {
         }catch(Exception e){return "Bhai, AI connection me problem aa gayi. Thodi der baad try karte hain.";}
     }
 
-    void toggleSidebar(){sidebar.setVisibility(sidebar.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE); if(sidebar.getVisibility()==View.VISIBLE)renderSidebar();}
+    void toggleSidebar(){
+        if(sidebar.getVisibility()==View.VISIBLE) closeSidebar();
+        else {
+            renderSidebar();
+            sidebar.setVisibility(View.VISIBLE);
+            findViewById(R.id.sidebarScrim).setVisibility(View.VISIBLE);
+        }
+    }
+
+    void closeSidebar(){
+        sidebar.setVisibility(View.GONE);
+        findViewById(R.id.sidebarScrim).setVisibility(View.GONE);
+    }
 
     void startVoice(){
         if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
