@@ -82,12 +82,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void newChat(){
-        JSONObject c=new JSONObject();
         try {
+            // Never delete the existing conversation.
+            // Save the current conversation before switching to a new one.
+            persist();
+
+            JSONObject c=new JSONObject();
             currentId=UUID.randomUUID().toString();
-            c.put("id",currentId); c.put("title","New chat"); c.put("messages",new JSONArray());
-            chats.put(0,c); persist(); renderCurrent();
-        } catch(Exception ignored){}
+            c.put("id",currentId);
+            c.put("title","New chat");
+            c.put("messages",new JSONArray());
+
+            chats.put(0,c);
+            persist();
+            renderCurrent();
+        } catch(Exception e){
+            Toast.makeText(this,"New chat create nahi ho paya.",Toast.LENGTH_SHORT).show();
+        }
     }
 
     JSONObject current(){
@@ -142,28 +153,132 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void addBubble(String role,String text){
-        LinearLayout box=new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
-        TextView who=new TextView(this); who.setText(role.equals("user")?"You":"MyAssistant");
-        who.setTextColor(role.equals("user")?purple:Color.rgb(150,153,165)); who.setTextSize(15); who.setTypeface(null,1);
-        TextView body=new TextView(this); body.setText(text); body.setTextColor(Color.WHITE); body.setTextSize(18);
-        body.setPadding(18,14,18,14);
-        body.setBackgroundResource(role.equals("user")?R.drawable.bg_message_user:R.drawable.bg_message_ai);
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
 
-        body.setOnLongClickListener(v -> {
-            copyMessage(text);
-            return true;
-        });
+        TextView who=new TextView(this);
+        who.setText(role.equals("user")?"You":"MyAssistant");
+        who.setTextColor(role.equals("user")?purple:Color.rgb(150,153,165));
+        who.setTextSize(15);
+        who.setTypeface(null,1);
 
-        LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2); bp.setMargins(0,6,0,18);
-        box.addView(who); box.addView(body,bp); messages.addView(box);
+        box.addView(who);
+
+        // Render markdown-style fenced code blocks separately.
+        int pos=0;
+        while(pos<text.length()){
+            int open=text.indexOf("```",pos);
+
+            if(open<0){
+                addSelectableText(box,text.substring(pos),role);
+                break;
+            }
+
+            if(open>pos){
+                addSelectableText(box,text.substring(pos,open),role);
+            }
+
+            int codeStart=text.indexOf('\n',open+3);
+            if(codeStart<0){
+                codeStart=open+3;
+            }else{
+                codeStart++;
+            }
+
+            int close=text.indexOf("```",codeStart);
+
+            if(close<0){
+                addCodeBlock(box,text.substring(codeStart));
+                break;
+            }
+
+            String code=text.substring(codeStart,close);
+            addCodeBlock(box,code);
+            pos=close+3;
+        }
+
+        LinearLayout.LayoutParams boxParams=
+            new LinearLayout.LayoutParams(-1,-2);
+        boxParams.setMargins(0,6,0,18);
+        messages.addView(box,boxParams);
     }
 
-    void copyMessage(String text){
-        ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-        if(cm!=null){
-            cm.setPrimaryClip(ClipData.newPlainText("MyAssistant",text));
-            Toast.makeText(this,"Copied ✓",Toast.LENGTH_SHORT).show();
-        }
+    void addSelectableText(LinearLayout parent,String text,String role){
+        if(text.trim().isEmpty()) return;
+
+        TextView body=new TextView(this);
+        body.setText(text.trim());
+        body.setTextColor(Color.WHITE);
+        body.setTextSize(18);
+        body.setTextIsSelectable(true);
+        body.setPadding(18,14,18,14);
+        body.setBackgroundResource(
+            role.equals("user")?R.drawable.bg_message_user:R.drawable.bg_message_ai
+        );
+
+        // Normal Android text selection: long-press -> select/copy.
+        body.setLongClickable(true);
+
+        LinearLayout.LayoutParams bp=
+            new LinearLayout.LayoutParams(-1,-2);
+        bp.setMargins(0,6,0,6);
+        parent.addView(body,bp);
+    }
+
+    void addCodeBlock(LinearLayout parent,String code){
+        LinearLayout card=new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(14,10,14,12);
+        card.setBackgroundColor(Color.rgb(24,25,32));
+
+        LinearLayout header=new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView label=new TextView(this);
+        label.setText("CODE");
+        label.setTextColor(purple);
+        label.setTextSize(13);
+        label.setTypeface(null,1);
+
+        Button copy=new Button(this);
+        copy.setText("Copy");
+        copy.setTextSize(12);
+        copy.setOnClickListener(v->{
+            ClipboardManager cm=
+                (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+            if(cm!=null){
+                cm.setPrimaryClip(
+                    ClipData.newPlainText("MyAssistant code",code)
+                );
+                Toast.makeText(this,"Code copied ✓",Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        header.addView(label,new LinearLayout.LayoutParams(
+            0,-2,1
+        ));
+        header.addView(copy,new LinearLayout.LayoutParams(
+            -2,-2
+        ));
+
+        TextView codeView=new TextView(this);
+        codeView.setText(code);
+        codeView.setTextColor(Color.rgb(235,235,240));
+        codeView.setTextSize(15);
+        codeView.setTypeface(android.graphics.Typeface.MONOSPACE);
+        codeView.setTextIsSelectable(true);
+        codeView.setLongClickable(true);
+        codeView.setPadding(4,12,4,8);
+
+        card.addView(header);
+        card.addView(codeView,new LinearLayout.LayoutParams(
+            -1,-2
+        ));
+
+        LinearLayout.LayoutParams cp=
+            new LinearLayout.LayoutParams(-1,-2);
+        cp.setMargins(0,8,0,8);
+        parent.addView(card,cp);
     }
 
     void send(){
